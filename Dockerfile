@@ -3,13 +3,13 @@ FROM ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlex/paddlex:paddlex3.0.1-paddlepad
 
 WORKDIR /app
 
-# 升级 paddlepaddle 到最新版本
-RUN python3 -m pip install --upgrade pip && \
-    python3 -m pip install --upgrade paddlepaddle -i https://pypi.tuna.tsinghua.edu.cn/simple
-
 COPY requirements.txt .
 
 RUN python3 -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 升级 paddlepaddle 到最新版本
+RUN python3 -m pip install --upgrade pip && \
+    python3 -m pip install --upgrade paddlepaddle -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 安装 PaddleOCR-VL 完整依赖
 RUN paddleocr install_hpi_deps cpu
