@@ -44,4 +44,6 @@ ENV MINERU_MODEL_SOURCE=local
 ENV PYTHONUNBUFFERED=1
 
 # RunPod serverless entry point
+# Override ENTRYPOINT from vllm base image
+ENTRYPOINT []
 CMD ["python3", "/app/handler.py"]
