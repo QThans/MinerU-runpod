@@ -39,12 +39,16 @@ VL_REC_API_KEY = os.getenv("VL_REC_API_KEY", "")
 
 # Performance configuration
 CPU_THREADS = int(os.getenv("CPU_THREADS", "8"))
-ENABLE_MKLDNN = os.getenv("ENABLE_MKLDNN", "true").lower() == "true"
-ENABLE_HPI = os.getenv("ENABLE_HPI", "true").lower() == "true"
+USE_HPIP = os.getenv("USE_HPIP", "true").lower() == "true"
 DEVICE = os.getenv("DEVICE", "cpu")
 PRECISION = os.getenv("PRECISION", "fp16")
 MAX_FILE_SIZE_MB = int(os.environ.get("MAX_FILE_SIZE_MB", "30"))
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
+# PDF restructure options
+MERGE_TABLE = os.getenv("MERGE_TABLE", "true").lower() == "true"
+RELEVEL_TITLES = os.getenv("RELEVEL_TITLES", "true").lower() == "true"
+MERGE_PAGES = os.getenv("MERGE_PAGES", "true").lower() == "true"
 
 # Initialize PaddleOCR VL pipeline
 _pipeline = None
@@ -55,32 +59,48 @@ def get_pipeline():
     global _pipeline
     if _pipeline is None:
         logger.info(
-            f"Initializing PaddleOCR-VL pipeline, vl_rec_server_url={VL_REC_SERVER_URL}"
+            f"Initializing PaddleOCR-VL pipeline, vl_rec_server_url={VL_REC_SERVER_URL}, use_hpip={USE_HPIP}"
         )
         _pipeline = PaddleOCRVL(
-            layout_detection_model_name="PP-DocLayoutV2",
+            pipeline_version="v1.5",
             vl_rec_backend="vllm-server",
             vl_rec_server_url=VL_REC_SERVER_URL,
             vl_rec_api_model_name=VL_REC_API_MODEL_NAME,
             vl_rec_api_key=VL_REC_API_KEY,
             device=DEVICE,
             cpu_threads=CPU_THREADS,
-            enable_mkldnn=ENABLE_MKLDNN,
-            enable_hpi=ENABLE_HPI,
             precision=PRECISION,
+            use_hpip=USE_HPIP,
         )
         logger.info("PaddleOCR-VL pipeline initialized")
     return _pipeline
 
 
-def _extract_markdown_from_result_sync(pipeline, result) -> tuple[str, int]:
+def _extract_markdown_from_result_sync(pipeline, result, is_pdf=False) -> tuple[str, int]:
     """Extract markdown content and page count from PaddleOCR-VL result"""
-    markdown_list = []
-    pages = 0
+    pages_res = list(result)
+    pages = len(pages_res)
 
+    if pages == 0:
+        return "", 0
+
+    # For PDF files, use restructure_pages to merge tables, relevel titles, and merge pages
+    if is_pdf and pages > 1:
+        try:
+            restructured = pipeline.restructure_pages(
+                pages_res,
+                merge_table=MERGE_TABLE,
+                relevel_titles=RELEVEL_TITLES,
+                merge_pages=MERGE_PAGES,
+            )
+            pages_res = list(restructured)
+            logger.info(f"PDF restructured: merge_table={MERGE_TABLE}, relevel_titles={RELEVEL_TITLES}, merge_pages={MERGE_PAGES}")
+        except Exception as e:
+            logger.warning(f"restructure_pages failed: {str(e)}, using original results")
+
+    markdown_list = []
     try:
-        for res in result:
-            pages += 1
+        for res in pages_res:
             md_info = res.markdown
             if md_info:
                 markdown_list.append(md_info)
@@ -117,9 +137,9 @@ def _extract_markdown_from_result_sync(pipeline, result) -> tuple[str, int]:
             return "", 0
 
 
-async def _extract_markdown_from_result(pipeline, result) -> tuple[str, int]:
+async def _extract_markdown_from_result(pipeline, result, is_pdf=False) -> tuple[str, int]:
     """Async version: extract markdown from result"""
-    return await asyncio.to_thread(_extract_markdown_from_result_sync, pipeline, result)
+    return await asyncio.to_thread(_extract_markdown_from_result_sync, pipeline, result, is_pdf)
 
 
 def _convert_result_sync(result):
@@ -201,10 +221,11 @@ async def parse_document(request: ParseRequest):
         pipeline = get_pipeline()
 
         result = await asyncio.to_thread(
-            pipeline.predict, input=request.input, use_layout_detection=False
+            pipeline.predict, input=request.input
         )
 
-        markdown, pages = await _extract_markdown_from_result(pipeline, result)
+        is_pdf = request.input.lower().endswith(".pdf")
+        markdown, pages = await _extract_markdown_from_result(pipeline, result, is_pdf=is_pdf)
         output = await asyncio.to_thread(_convert_result_sync, result)
 
         logger.info(f"URL processing complete, pages={pages}")
@@ -262,10 +283,11 @@ async def parse_file(file: UploadFile = File(...)):
 
             pipeline = get_pipeline()
             result = await asyncio.to_thread(
-                pipeline.predict, input=str(temp_path), use_layout_detection=False
+                pipeline.predict, input=str(temp_path)
             )
 
-            markdown, pages = await _extract_markdown_from_result(pipeline, result)
+            is_pdf = file_extension == ".pdf"
+            markdown, pages = await _extract_markdown_from_result(pipeline, result, is_pdf=is_pdf)
             output = await asyncio.to_thread(_convert_result_sync, result)
 
             logger.info(f"File processing complete, pages={pages}")
