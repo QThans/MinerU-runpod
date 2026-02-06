@@ -46,7 +46,7 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 # PDF restructure options
 MERGE_TABLES = os.getenv("MERGE_TABLES", "true").lower() == "true"
 RELEVEL_TITLES = os.getenv("RELEVEL_TITLES", "true").lower() == "true"
-CONCATENATE_PAGES = os.getenv("CONCATENATE_PAGES", "false").lower() == "true"
+CONCATENATE_PAGES = os.getenv("CONCATENATE_PAGES", "true").lower() == "true"
 
 # Initialize PaddleOCR VL pipeline
 _pipeline = None
