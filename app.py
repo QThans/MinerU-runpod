@@ -4,12 +4,11 @@ Provides HTTP endpoint for document parsing using PaddleOCR VL API
 """
 
 import os
-import tempfile
-import json
-from flask import Flask, request, jsonify
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from paddleocr import PaddleOCRVL
 
-app = Flask(__name__)
+app = FastAPI()
 
 # Configuration from environment variables
 VL_REC_SERVER_URL = os.getenv("VL_REC_SERVER_URL", "https://api.siliconflow.cn/v1")
@@ -49,14 +48,18 @@ def get_pipeline():
     return pipeline
 
 
-@app.route("/health", methods=["GET"])
+class ParseRequest(BaseModel):
+    input: str
+
+
+@app.get("/health")
 def health():
     """Health check endpoint"""
-    return jsonify({"status": "healthy"})
+    return {"status": "healthy"}
 
 
-@app.route("/parse", methods=["POST"])
-def parse_document():
+@app.post("/parse")
+def parse_document(request: ParseRequest):
     """
     Parse document using PaddleOCR VL
 
@@ -67,16 +70,9 @@ def parse_document():
         - result: OCR parsing result
         - status: success/error
     """
-    data = request.get_json()
-
-    if not data or "input" not in data:
-        return jsonify({"status": "error", "message": "Missing 'input' field"}), 400
-
-    input_source = data["input"]
-
     try:
         ocr = get_pipeline()
-        result = ocr.predict(input_source)
+        result = ocr.predict(request.input)
 
         # Convert result to serializable format
         output = []
@@ -88,12 +84,13 @@ def parse_document():
             else:
                 output.append(str(item))
 
-        return jsonify({"status": "success", "result": output})
+        return {"status": "success", "result": output}
 
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
+    import uvicorn
     port = int(os.getenv("PORT", "8000"))
-    app.run(host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port)

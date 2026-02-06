@@ -32,6 +32,6 @@ RUN yes | paddleocr install_hpi_deps cpu
 
 COPY app.py ./
 
-EXPOSE 8011
+EXPOSE 8000
 
-ENTRYPOINT ["python3", "app.py"]
+ENTRYPOINT ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
