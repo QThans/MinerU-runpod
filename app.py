@@ -58,6 +58,7 @@ def get_pipeline():
             f"Initializing PaddleOCR-VL pipeline, vl_rec_server_url={VL_REC_SERVER_URL}"
         )
         _pipeline = PaddleOCRVL(
+            layout_detection_model_name="PP-DocLayoutV2",
             vl_rec_backend="vllm-server",
             vl_rec_server_url=VL_REC_SERVER_URL,
             vl_rec_api_model_name=VL_REC_API_MODEL_NAME,
