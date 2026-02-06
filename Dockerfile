@@ -17,8 +17,8 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install PaddleOCR and Flask
-RUN pip install --no-cache-dir paddleocr flask
+RUN pip install --no-cache-dir flask paddleocr && \
+    paddleocr install_hpi_deps cpu
 
 # Set working directory
 WORKDIR /app
