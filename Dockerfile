@@ -28,7 +28,7 @@ RUN python3 -m pip install --upgrade pip && \
 
 RUN python3 -m pip install paddlepaddle
 
-RUN paddleocr install_hpi_deps cpu -y
+RUN yes | paddleocr install_hpi_deps cpu
 
 COPY app.py ./
 
