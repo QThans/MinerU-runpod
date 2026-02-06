@@ -54,7 +54,9 @@ def get_pipeline():
     """Lazy initialization of PaddleOCR VL pipeline"""
     global _pipeline
     if _pipeline is None:
-        logger.info(f"Initializing PaddleOCR-VL pipeline, vl_rec_server_url={VL_REC_SERVER_URL}")
+        logger.info(
+            f"Initializing PaddleOCR-VL pipeline, vl_rec_server_url={VL_REC_SERVER_URL}"
+        )
         _pipeline = PaddleOCRVL(
             vl_rec_backend="vllm-server",
             vl_rec_server_url=VL_REC_SERVER_URL,
@@ -92,12 +94,18 @@ def _extract_markdown_from_result_sync(pipeline, result) -> tuple[str, int]:
         markdown_texts = pipeline.concatenate_markdown_pages(markdown_list)
         return markdown_texts, pages
     except Exception as e:
-        logger.warning(f"concatenate_markdown_pages failed: {str(e)}, trying manual merge")
+        logger.warning(
+            f"concatenate_markdown_pages failed: {str(e)}, trying manual merge"
+        )
         try:
             text_parts = []
             for md_info in markdown_list:
                 if isinstance(md_info, dict):
-                    text = md_info.get("markdown_texts") or md_info.get("markdown_text") or ""
+                    text = (
+                        md_info.get("markdown_texts")
+                        or md_info.get("markdown_text")
+                        or ""
+                    )
                     if text:
                         text_parts.append(text)
                 elif isinstance(md_info, str):
@@ -120,13 +128,17 @@ def _convert_result_sync(result):
         if hasattr(item, "to_dict"):
             output.append(item.to_dict())
         elif hasattr(item, "__dict__"):
-            output.append({k: v for k, v in item.__dict__.items() if not str(k).startswith("_")})
+            output.append(
+                {k: v for k, v in item.__dict__.items() if not str(k).startswith("_")}
+            )
         else:
             output.append(str(item))
     return output
 
 
-async def _write_upload_file(upload_file: UploadFile, dest_path: Path, max_size_bytes: int) -> int:
+async def _write_upload_file(
+    upload_file: UploadFile, dest_path: Path, max_size_bytes: int
+) -> int:
     """Write UploadFile to destination path with size check"""
     chunk_size = 1024 * 1024  # 1MB
     total_written = 0
@@ -243,7 +255,9 @@ async def parse_file(file: UploadFile = File(...)):
                 raise HTTPException(status_code=400, detail="File is empty")
 
             mime_type, _ = mimetypes.guess_type(file.filename)
-            logger.info(f"File saved: path={temp_path}, size={file_size} bytes, mime={mime_type}")
+            logger.info(
+                f"File saved: path={temp_path}, size={file_size} bytes, mime={mime_type}"
+            )
 
             pipeline = get_pipeline()
             result = await asyncio.to_thread(
@@ -266,6 +280,7 @@ async def parse_file(file: UploadFile = File(...)):
     except HTTPException:
         raise
     except Exception as e:
+        print(e)
         logger.error(f"Error processing file: {str(e)}")
         return JSONResponse(
             content={"status": "error", "message": str(e)},
@@ -275,5 +290,6 @@ async def parse_file(file: UploadFile = File(...)):
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.getenv("PORT", "8000"))
     uvicorn.run(app, host="0.0.0.0", port=port)
