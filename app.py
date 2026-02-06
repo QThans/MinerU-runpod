@@ -4,6 +4,8 @@ Provides HTTP endpoint for document parsing using PaddleOCR VL API
 """
 
 import os
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from paddleocr import PaddleOCRVL
@@ -26,6 +28,7 @@ PRECISION = os.getenv("PRECISION", "fp16")  # fp32, fp16
 
 # Initialize PaddleOCR VL pipeline
 pipeline = None
+executor = ThreadPoolExecutor(max_workers=4)
 
 
 def get_pipeline():
@@ -48,6 +51,23 @@ def get_pipeline():
     return pipeline
 
 
+def run_ocr(input_source: str):
+    """Run OCR in a separate thread with its own event loop"""
+    ocr = get_pipeline()
+    result = ocr.predict(input_source)
+
+    # Convert result to serializable format
+    output = []
+    for item in result:
+        if hasattr(item, "to_dict"):
+            output.append(item.to_dict())
+        elif hasattr(item, "__dict__"):
+            output.append(item.__dict__)
+        else:
+            output.append(str(item))
+    return output
+
+
 class ParseRequest(BaseModel):
     input: str
 
@@ -59,7 +79,7 @@ def health():
 
 
 @app.post("/parse")
-def parse_document(request: ParseRequest):
+async def parse_document(request: ParseRequest):
     """
     Parse document using PaddleOCR VL
 
@@ -71,19 +91,8 @@ def parse_document(request: ParseRequest):
         - status: success/error
     """
     try:
-        ocr = get_pipeline()
-        result = ocr.predict(request.input)
-
-        # Convert result to serializable format
-        output = []
-        for item in result:
-            if hasattr(item, "to_dict"):
-                output.append(item.to_dict())
-            elif hasattr(item, "__dict__"):
-                output.append(item.__dict__)
-            else:
-                output.append(str(item))
-
+        loop = asyncio.get_event_loop()
+        output = await loop.run_in_executor(executor, run_ocr, request.input)
         return {"status": "success", "result": output}
 
     except Exception as e:
