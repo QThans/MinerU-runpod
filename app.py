@@ -40,6 +40,7 @@ VL_REC_API_KEY = os.getenv("VL_REC_API_KEY", "")
 # Performance configuration
 DEVICE = os.getenv("DEVICE", "cpu")
 ENABLE_HPI = os.getenv("ENABLE_HPI", "true").lower() == "true"
+LAYOUT_MODEL = os.getenv("LAYOUT_MODEL", "PP-DocLayoutV2")  # PP-DocLayoutV2 支持 HPI，PP-DocLayoutV3 暂不支持
 MAX_FILE_SIZE_MB = int(os.environ.get("MAX_FILE_SIZE_MB", "30"))
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
@@ -57,10 +58,11 @@ def get_pipeline():
     global _pipeline
     if _pipeline is None:
         logger.info(
-            f"Initializing PaddleOCR-VL pipeline, vl_rec_server_url={VL_REC_SERVER_URL}, enable_hpi={ENABLE_HPI}"
+            f"Initializing PaddleOCR-VL pipeline, vl_rec_server_url={VL_REC_SERVER_URL}, enable_hpi={ENABLE_HPI}, layout_model={LAYOUT_MODEL}"
         )
         _pipeline = PaddleOCRVL(
             pipeline_version="v1.5",
+            layout_detection_model_name=LAYOUT_MODEL,
             vl_rec_backend="vllm-server",
             vl_rec_server_url=VL_REC_SERVER_URL,
             vl_rec_api_model_name=VL_REC_API_MODEL_NAME,
